@@ -51,8 +51,6 @@ dotnet test tests/WifiTool.Tests/WifiTool.Tests.csproj -c Release
 dotnet publish src/WifiTool.App/WifiTool.App.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishTrimmed=false -o dist/wifitool-win-x64
 ```
 
-이벤트 의미와 지원 범위는 [이벤트 매핑](docs/event-map.md), 검증 항목은 [테스트 계획](docs/test-plan.md), 변경 내역은 [history](docs/history.md)를 참고하십시오.
-
 ## 의존성
 
 - Microsoft .NET 10

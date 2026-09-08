@@ -2,6 +2,7 @@ dist/
 releases/
 build/
 artifacts/
+docs/
 **/bin/
 **/obj/
 .vs/
