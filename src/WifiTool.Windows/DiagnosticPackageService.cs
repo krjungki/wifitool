@@ -22,13 +22,20 @@ public sealed record PackageManifest(
     string DisplayTimeZone,
     IReadOnlyList<PackageEntry> Files,
     IReadOnlyList<ChannelStatus> Channels,
-    bool Partial);
+    bool Partial)
+{
+    public bool SecurityLogRequested { get; init; }
+    public bool WifiProfilesRequested { get; init; }
+    public int ProfilesFound { get; init; }
+    public int ProfilesExported { get; init; }
+}
 
 public sealed record PackageCreationResult(string Path, PackageManifest Manifest);
 
 public sealed class DiagnosticPackageService
 {
-    public const int MaxEntries = 64;
+    private static readonly string[] DefaultEventChannels = ["System", "Microsoft-Windows-WLAN-AutoConfig/Operational"];
+    public const int MaxEntries = 2048;
     public const long MaxUncompressedBytes = 512L * 1024 * 1024;
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
@@ -39,6 +46,8 @@ public sealed class DiagnosticPackageService
         IEnumerable<string> channels,
         IReadOnlyList<TimelineEntry> timeline,
         IReadOnlyList<WifiProfileSnapshot> profiles,
+        bool wifiProfilesRequested = false,
+        string? wifiProfileError = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(destination);
@@ -52,7 +61,13 @@ public sealed class DiagnosticPackageService
         try
         {
             var statuses = ExportChannels(workspace, from, to, channels, cancellationToken);
-            WriteProfiles(workspace, profiles, cancellationToken);
+            var profilesExported = WriteProfiles(workspace, profiles, cancellationToken);
+            if (wifiProfilesRequested)
+            {
+                var profileStatus = wifiProfileError is not null ? "error" : profiles.Count == 0 ? "empty" : profilesExported == profiles.Count ? "available" : "partial";
+                statuses.Add(new ChannelStatus("Wi-Fi profiles", profileStatus, profilesExported,
+                    wifiProfileError ?? $"조회 {profiles.Count}개, 안전한 XML 내보내기 {profilesExported}개"));
+            }
             WriteTimeline(workspace, timeline, cancellationToken);
             WriteInventory(workspace, cancellationToken);
             File.WriteAllText(Path.Combine(workspace, "collection-status.json"), JsonSerializer.Serialize(statuses, JsonOptions), new UTF8Encoding(false));
@@ -68,7 +83,13 @@ public sealed class DiagnosticPackageService
                 TimeZoneInfo.Local.Id,
                 files,
                 statuses,
-                statuses.Any(item => item.Status is not ("available" or "empty")));
+                statuses.Any(item => item.Status is not ("available" or "empty")))
+            {
+                SecurityLogRequested = channels.Contains("Security", StringComparer.OrdinalIgnoreCase),
+                WifiProfilesRequested = wifiProfilesRequested,
+                ProfilesFound = profiles.Count,
+                ProfilesExported = profilesExported
+            };
             File.WriteAllText(Path.Combine(workspace, "manifest.json"), JsonSerializer.Serialize(manifest, JsonOptions), new UTF8Encoding(false));
 
             if (File.Exists(pending)) File.Delete(pending);
@@ -96,7 +117,7 @@ public sealed class DiagnosticPackageService
             var windowsAttributes = entry.ExternalAttributes & 0xFFFF;
             if (unixFileType == 0xA000 || (windowsAttributes & (int)FileAttributes.ReparsePoint) != 0)
                 throw new InvalidDataException("ZIP link 항목은 허용하지 않습니다.");
-            if (entry.CompressedLength > 0 && entry.Length / Math.Max(1, entry.CompressedLength) > 200)
+            if (entry.Length > 1024 * 1024 && entry.CompressedLength > 0 && entry.Length / Math.Max(1, entry.CompressedLength) > 200)
                 throw new InvalidDataException("비정상적인 압축비를 가진 항목이 있습니다.");
         }
 
@@ -124,6 +145,9 @@ public sealed class DiagnosticPackageService
         return manifest;
     }
 
+    public static IReadOnlyList<string> BuildEventChannels(bool includeSecurityLog) =>
+        includeSecurityLog ? [.. DefaultEventChannels, "Security"] : DefaultEventChannels;
+
     private static List<ChannelStatus> ExportChannels(
         string workspace,
         DateTimeOffset from,
@@ -134,9 +158,7 @@ public sealed class DiagnosticPackageService
         var result = new List<ChannelStatus>();
         var eventDirectory = Directory.CreateDirectory(Path.Combine(workspace, "events"));
         using var session = new EventLogSession();
-        var start = from.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture);
-        var end = to.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture);
-        var query = $"*[System[TimeCreated[@SystemTime&gt;='{start}' and @SystemTime&lt;='{end}']]]";
+        var query = BuildRangeQuery(from, to);
         var index = 0;
 
         foreach (var channel in channels.Distinct(StringComparer.OrdinalIgnoreCase))
@@ -164,17 +186,27 @@ public sealed class DiagnosticPackageService
         return result;
     }
 
-    private static void WriteProfiles(string workspace, IReadOnlyList<WifiProfileSnapshot> profiles, CancellationToken cancellationToken)
+    public static string BuildRangeQuery(DateTimeOffset from, DateTimeOffset to)
     {
-        if (profiles.Count == 0) return;
+        var start = from.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture);
+        var end = to.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture);
+        return $"*[System[TimeCreated[@SystemTime>='{start}' and @SystemTime<='{end}']]]";
+    }
+
+    private static int WriteProfiles(string workspace, IReadOnlyList<WifiProfileSnapshot> profiles, CancellationToken cancellationToken)
+    {
+        if (profiles.Count == 0) return 0;
         var directory = Directory.CreateDirectory(Path.Combine(workspace, "profiles"));
+        var exported = 0;
         for (var index = 0; index < profiles.Count; index++)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var profile = profiles[index];
             if (profile.SanitizedXml is null || profile.ExportBlockedReason is not null) continue;
             File.WriteAllText(Path.Combine(directory.FullName, $"profile-{index + 1:D2}.xml"), profile.SanitizedXml, new UTF8Encoding(false));
+            exported++;
         }
+        return exported;
     }
 
     private static void WriteTimeline(string workspace, IReadOnlyList<TimelineEntry> timeline, CancellationToken cancellationToken)

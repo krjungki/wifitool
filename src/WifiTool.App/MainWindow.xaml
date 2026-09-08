@@ -163,12 +163,16 @@
 
             <TabItem Header="수집 및 범위">
                 <Grid Margin="0,10,0,0">
-                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition/><RowDefinition Height="18"/></Grid.RowDefinitions>
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition/><RowDefinition Height="18"/></Grid.RowDefinitions>
+                    <WrapPanel Margin="0,0,0,8" VerticalAlignment="Center">
                         <Button Content="최근 24시간 ZIP 저장" Command="{Binding SavePackageCommand}" />
-                        <TextBlock Text="System과 WLAN Operational을 수집합니다. Security 로그는 기본 제외됩니다." VerticalAlignment="Center" Foreground="#58666C" />
-                    </StackPanel>
-                    <DataGrid x:Name="CollectionDataGrid" Grid.Row="1" ItemsSource="{Binding ChannelStatuses}">
+                        <CheckBox Content="Security 로그 포함" IsChecked="{Binding IncludeSecurityLog}" VerticalAlignment="Center" Margin="8,0,18,0" ToolTip="계정·로그온 상세가 풍부해지지만 민감정보와 관리자 권한이 필요할 수 있습니다." />
+                        <CheckBox Content="Wi-Fi 프로필 포함" IsChecked="{Binding IncludeWifiProfiles}" VerticalAlignment="Center" Margin="0,0,12,0" />
+                        <TextBlock Text="SSID" VerticalAlignment="Center" Margin="0,0,6,0" />
+                        <TextBox Width="190" Text="{Binding ProfileSsid}" IsEnabled="{Binding IncludeWifiProfiles}" ToolTip="비워 두면 조회 가능한 모든 Wi-Fi 프로필을 수집합니다." />
+                    </WrapPanel>
+                    <TextBlock Grid.Row="1" Text="Security 로그에는 계정·SID·로그온 상태가 포함됩니다. Wi-Fi 프로필은 keyMaterial과 자격 증명 요소를 제거한 XML만 ZIP에 저장합니다." Foreground="#58666C" TextWrapping="Wrap" Margin="4,0,0,8" />
+                    <DataGrid x:Name="CollectionDataGrid" Grid.Row="2" ItemsSource="{Binding ChannelStatuses}">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="채널/입력" Binding="{Binding Channel}" Width="360" />
                             <DataGridTextColumn Header="상태" Binding="{Binding Status}" Width="120" />
@@ -176,7 +180,7 @@
                             <DataGridTextColumn Header="상세" Binding="{Binding Details}" Width="520" />
                         </DataGrid.Columns>
                     </DataGrid>
-                    <ScrollBar x:Name="CollectionHorizontalScrollBar" Grid.Row="2" Orientation="Horizontal" Height="18" />
+                    <ScrollBar x:Name="CollectionHorizontalScrollBar" Grid.Row="3" Orientation="Horizontal" Height="18" />
                 </Grid>
             </TabItem>
         </TabControl>

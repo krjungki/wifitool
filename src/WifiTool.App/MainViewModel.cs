@@ -28,6 +28,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private string _ssidFilter = string.Empty;
     private string _searchText = string.Empty;
     private string _profileSsid = string.Empty;
+    private bool _includeSecurityLog;
+    private bool _includeWifiProfiles = true;
     private bool _isBusy;
     private TimelineEntry? _selectedTimeline;
     private WifiProfileSnapshot? _selectedProfile;
@@ -61,6 +63,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public string AnalysisSummary { get => _analysisSummary; private set => Set(ref _analysisSummary, value); }
     public bool IsBusy { get => _isBusy; private set { if (Set(ref _isBusy, value)) RefreshCommands(); } }
     public string ProfileSsid { get => _profileSsid; set => Set(ref _profileSsid, value); }
+    public bool IncludeSecurityLog { get => _includeSecurityLog; set => Set(ref _includeSecurityLog, value); }
+    public bool IncludeWifiProfiles { get => _includeWifiProfiles; set => Set(ref _includeWifiProfiles, value); }
     public TimelineEntry? SelectedTimeline { get => _selectedTimeline; set => Set(ref _selectedTimeline, value); }
     public WifiProfileSnapshot? SelectedProfile { get => _selectedProfile; set => Set(ref _selectedProfile, value); }
     public string SsidFilter { get => _ssidFilter; set { if (Set(ref _ssidFilter, value)) FilteredTimeline.Refresh(); } }
@@ -108,8 +112,41 @@ public sealed class MainViewModel : INotifyPropertyChanged
         if (dialog.ShowDialog() != true) return;
         await RunAsync("진단 ZIP을 만드는 중...", token =>
         {
-            var result = _packageService.Create(dialog.FileName, DateTimeOffset.UtcNow.AddHours(-24), DateTimeOffset.UtcNow, DefaultChannels, Timeline.ToList(), Profiles.ToList(), token);
-            Application.Current.Dispatcher.Invoke(() => StatusText = $"ZIP 저장 완료: {result.Path} ({(result.Manifest.Partial ? "일부 수집" : "완전 수집")})");
+            var channels = DiagnosticPackageService.BuildEventChannels(IncludeSecurityLog);
+            IReadOnlyList<WifiProfileSnapshot> profiles = [];
+            string? profileError = null;
+            if (IncludeWifiProfiles)
+            {
+                try
+                {
+                    profiles = _profileSource.ReadProfiles(string.IsNullOrWhiteSpace(ProfileSsid) ? null : ProfileSsid.Trim());
+                }
+                catch (Exception exception)
+                {
+                    profileError = exception.Message;
+                }
+            }
+            var result = _packageService.Create(
+                dialog.FileName,
+                DateTimeOffset.UtcNow.AddHours(-24),
+                DateTimeOffset.UtcNow,
+                channels,
+                Timeline.ToList(),
+                profiles,
+                IncludeWifiProfiles,
+                profileError,
+                token);
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                if (IncludeWifiProfiles)
+                {
+                    Profiles.Clear();
+                    foreach (var profile in profiles) Profiles.Add(profile);
+                }
+                ChannelStatuses.Clear();
+                foreach (var status in result.Manifest.Channels) ChannelStatuses.Add(status);
+                StatusText = $"ZIP 저장 완료: {result.Path} · {(result.Manifest.Partial ? "일부 수집" : "완전 수집")} · Security {(IncludeSecurityLog ? "포함" : "제외")} · 프로필 {result.Manifest.ProfilesExported}/{result.Manifest.ProfilesFound}개";
+            });
         });
     }
 

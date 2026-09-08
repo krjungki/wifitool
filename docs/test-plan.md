@@ -20,6 +20,10 @@ dotnet test tests/WifiTool.Tests/WifiTool.Tests.csproj -c Release
 | Intel binary | 7021 SSID/BSSID, 7003 이전/새 BSSID, 짧은 payload 안전 무시 |
 | Coverage summary | WLAN Operational/Security 부재와 원인 비단정 표시 |
 | Provider guard | VSS 8194를 Group Policy 영향으로 오인하지 않음 |
+| Security option | 기본 제외, checkbox 선택 시 Security 채널 요청 및 manifest 기록 |
+| Profile collection | 전체/SSID 프로필 자동 조회, 안전 XML만 ZIP 포함, 발견/내보내기 수 기록 |
+| Partial collection | Security 권한 거부·프로필 조회 실패에도 나머지 ZIP 보존 |
+| Managed profiles | 70개 이상의 프로필과 작은 고압축 XML 허용, 큰 고압축 entry 차단 |
 
 합성 fixture에는 고객명, 실제 계정, 실제 SSID, 원본 EVTX를 사용하지 않습니다.
 
@@ -37,6 +41,8 @@ dotnet test tests/WifiTool.Tests/WifiTool.Tests.csproj -c Release
 2026-09-08 실행 결과: Windows 11 Enterprise 10.0.26200 x64에서 `--version`, 주 창 생성/정상 종료, 900x580 초기 화면 캡처는 PASS. 버튼 2~7은 민감정보 접근 동의 전이므로 미실행이다.
 
 2026-09-08 private 첨부 EVTX 회귀: Application/System 118,121건을 약 10초에 처리해 타임라인 1,656건을 생성했다. SSID/BSSID 1,207건과 고유 SSID 23개가 복원됐고 부팅 46, 로그온 40, 연결 669, 실패 3, 로밍 538건이 UI 상단과 집계 probe에서 일치했다. 시스템 상태 탭은 부팅 46, 종료 절차 84, 절전 10, 복귀 19, 비정상 종료 증거 8건을 표시했다. 기존 일반 네트워크 영향 567건은 로그온 후 Wi-Fi 연결 전 종속 서비스 실패 49건(DNS 10, GPO CSE 9, GPO 네트워크 9, GPO 확장 16, DC 연결 5)으로 축소했다. 각 DataGrid `Loaded` 시점에 고정 하단 scrollbar를 연결하고 star 열을 고정 폭으로 교체했다. 타임라인에서 scrollbar 값 `0→902.29`, DataGrid horizontal scroll percent `0→100` 동기화와 오른쪽 끝 열 표시를 확인했다. private 원본·경로·계정·SSID/BSSID 값은 테스트 fixture나 문서에 복제하지 않았다.
+
+2026-09-08 수집 smoke: Security와 Wi-Fi 프로필을 선택한 1분 범위 ZIP을 OS temp에서 생성·검증 후 삭제했다. Security 요청은 manifest에 남았고 일반 권한에서는 `denied`로 partial 처리됐다. 프로필 70개 중 안전 검증된 XML 69개가 ZIP에 포함됐고 재열기 hash 검증을 통과했다. UI에서 Security checkbox `Off`, Wi-Fi 프로필 checkbox `On` 기본 상태를 확인했다.
 
 실제 계정/SSID가 화면과 ZIP에 나타날 수 있으므로 smoke 산출물은 repository에 저장하지 않습니다.
 
