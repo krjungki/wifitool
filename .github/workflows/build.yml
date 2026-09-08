@@ -1,0 +1,20 @@
+name: build
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet restore WifiTool.sln
+      - run: dotnet build WifiTool.sln -c Release --no-restore
+      - run: dotnet test tests/WifiTool.Tests/WifiTool.Tests.csproj -c Release --no-build

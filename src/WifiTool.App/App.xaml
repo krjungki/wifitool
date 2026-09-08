@@ -1,0 +1,9 @@
+<!-- wifitool의 WPF 리소스와 애플리케이션 수명 주기를 선언한다. -->
+<Application x:Class="WifiTool.App.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:WifiTool.App">
+    <Application.Resources>
+
+    </Application.Resources>
+</Application>
